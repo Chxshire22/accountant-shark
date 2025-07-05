@@ -28,17 +28,25 @@ async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chatID: int = update.effective_chat.id
     currentUsername: str = update.effective_user.username
     currentUserID: int = update.effective_user.id
-    user_search = cursor.execute(f"SELECT * FROM Users WHERE user_id={currentUserID};")
-    if user_search.fetchone() is None:
-        cursor.execute(f"INSERT INTO Users (user_id, username) VALUES ({currentUserID},'{currentUsername}');")
 
-    chat_search = cursor.execute(f"SELECT * FROM Groups WHERE group_id={chatID};")
+    user_search_sql = "SELECT * FROM Users WHERE user_id=?;"
+    user_search = cursor.execute(user_search_sql,(currentUserID,))
+    if user_search.fetchone() is None:
+        sql = "INSERT INTO Users (user_id, username) VALUES (?,?);"
+        cursor.execute(sql, (currentUserID, currentUsername,))
+
+    chat_search_sql = "SELECT * FROM Groups WHERE group_id=?;"
+    chat_search = cursor.execute(chat_search_sql, (chatID,))
     if chat_search.fetchone() is None:
-        cursor.execute(f"INSERT INTO Groups (group_id) VALUES ({chatID});")
-        
-    user_groups_search = cursor.execute(f"SELECT * FROM User_Groups WHERE user_id={currentUserID} AND group_id={chatID};")
+        sql = "INSERT INTO Groups (group_id) VALUES (?);"
+        cursor.execute(sql, (chatID,))
+    
+    user_groups_search_sql = "SELECT * FROM User_Groups WHERE user_id=? AND group_id=?;"
+    user_groups_search = cursor.execute(user_groups_search_sql, (currentUserID,chatID,))
     if user_groups_search.fetchone() is None:
-        cursor.execute(f"INSERT INTO User_Groups (user_id,group_id) VALUES ({currentUserID}, {chatID});")
+        sql = "INSERT INTO User_Groups (user_id,group_id) VALUES (?, ?);"
+        cursor.execute(sql, (currentUserID,chatID,))
+        connection.commit()
         await update.message.reply_text(f"@{currentUsername}'s record for this group is created.")
     else:
         await update.message.reply_text("Your record for this chat is already created, you don't have to do that.")
@@ -65,6 +73,8 @@ I'll tell you who you owe and how much.
 Not sure who owes you? -
 Send me this, "Who owes me?"
 I'll tell you who owes you and how much. 
+
+want to build useful bots? connect with us on https://forum.bladerunner.net
         """
     )
 
@@ -162,8 +172,8 @@ def owed():
 
 
 # <leader>xx shows all the linting issues...
-#TODO: create function to register users into the db.
-#TODO: create function to register group into the db
+#TODO: create function to register users into the db. DONE
+#TODO: create function to register group into the db. DONE
 #TODO: create function to POST new debt
 #TODO: create function to PUT/UPDATE debt record of one user against another. 
 #TODO: create function to GET debts owed to user.
