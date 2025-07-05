@@ -27,34 +27,34 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chatID: int = update.effective_chat.id
-    currentUsername: str = update.effective_user.username
-    currentUserID: int = update.effective_user.id
+    chat_id: int = update.effective_chat.id
+    current_username: str = update.effective_user.username
+    current_user_id: int = update.effective_user.id
 
     user_search_sql = "SELECT * FROM Users WHERE user_id=?;"
-    user_search = cursor.execute(user_search_sql, (currentUserID,))
+    user_search = cursor.execute(user_search_sql, (current_user_id,))
     if user_search.fetchone() is None:
         sql = "INSERT INTO Users (user_id, username) VALUES (?,?);"
         cursor.execute(
             sql,
             (
-                currentUserID,
-                currentUsername,
+                current_user_id,
+                current_username,
             ),
         )
 
     chat_search_sql = "SELECT * FROM Groups WHERE group_id=?;"
-    chat_search = cursor.execute(chat_search_sql, (chatID,))
+    chat_search = cursor.execute(chat_search_sql, (chat_id,))
     if chat_search.fetchone() is None:
         sql = "INSERT INTO Groups (group_id) VALUES (?);"
-        cursor.execute(sql, (chatID,))
+        cursor.execute(sql, (chat_id,))
 
     user_groups_search_sql = "SELECT * FROM User_Groups WHERE user_id=? AND group_id=?;"
     user_groups_search = cursor.execute(
         user_groups_search_sql,
         (
-            currentUserID,
-            chatID,
+            current_user_id,
+            chat_id,
         ),
     )
     if user_groups_search.fetchone() is None:
@@ -62,13 +62,13 @@ async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cursor.execute(
             sql,
             (
-                currentUserID,
-                chatID,
+                current_user_id,
+                chat_id,
             ),
         )
         connection.commit()
         await update.message.reply_text(
-            f"@{currentUsername}'s record for this group is created."
+            f"@{current_username}'s record for this group is created."
         )
     else:
         await update.message.reply_text(
@@ -122,13 +122,13 @@ def owed():
     return
 
 
-def parse_message(text, chatID, currentUsername, currentUserID):
+def parse_message(text, chat_id, current_username, current_user_id):
     if BOT_USERNAME in text:
         text: str = text.replace(BOT_USERNAME, "").strip()
     text: str = text.lower()
     if "hello" in text:
         hello_str: str = (
-            f"chat ID: {chatID}\nUsername: @{currentUsername}\nUserID: {currentUserID}"
+            f"chat ID: {chat_id}\nUsername: @{current_username}\nUserID: {current_user_id}"
         )
         return hello_str
     if "i paid" in text:
@@ -152,15 +152,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Data from the text message
     text: str = update.message.text
-    chatID: int = update.effective_chat.id
-    currentUsername: str = update.effective_user.username
-    currentUserID: int = update.effective_user.id
+    chat_id: int = update.effective_chat.id
+    current_username: str = update.effective_user.username
+    current_user_id: int = update.effective_user.id
 
     # Debugging purposes
     print(f'User ({update.message.chat.id}) in {message_type}: "{text}"')
-    print(f"{currentUsername}")
+    print(f"{current_username}")
 
-    response: str = parse_message(text, chatID, currentUsername, currentUserID)
+    response: str = parse_message(text, chat_id, current_username, current_user_id)
 
     print("BOT:", response)
     await update.message.reply_text(response)
