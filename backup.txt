@@ -1,0 +1,17 @@
+    user_search = cursor.execute(f"SELECT * FROM Users WHERE user_id={currentUserID};")
+    if user_search.fetchone() is None:
+        cursor.execute(f"INSERT INTO Users (user_id, username) VALUES ({currentUserID},'{currentUsername}');")
+        connection.commit()
+
+    chat_search = cursor.execute(f"SELECT * FROM Groups WHERE group_id={chatID};")
+    if chat_search.fetchone() is None:
+        cursor.execute(f"INSERT INTO Groups (group_id) VALUES ({chatID});")
+        connection.commit()
+
+    user_groups_search = cursor.execute(f"SELECT * FROM User_Groups WHERE user_id={currentUserID} AND group_id={chatID};")
+    if user_groups_search.fetchone() is None:
+        cursor.execute(f"INSERT INTO User_Groups (user_id,group_id) VALUES ({currentUsername}, {chatID});")
+        connection.commit()
+        await update.message.reply_text(f"@{currentUsername}'s record for this group is created.")
+    else:
+        await update.message.reply_text("Your record for this group chat is already created, you don't have to do that.")
