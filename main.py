@@ -1,3 +1,4 @@
+import math
 import sqlite3
 from typing import Final
 
@@ -92,6 +93,8 @@ Send "@AccountantShark @user paid me $X"
 I'll check if they exist, owe you that much or more, then deduct it from the balance.
 The debt is cleared once the debt is 0. 
 
+DO NOT tag me when clearing debt, your debtor will do it as above 
+
 Not sure how much you owe? -
 Send "@AccountantShark how much do I owe?"
 I'll tell you who you owe and how much.
@@ -101,13 +104,67 @@ Send "@AccountantShark who owes me?"
 I'll tell you who owes you and how much. 
 
 want to build useful bots or contribute to the project? connect with us on https://forum.bladerunners.net
+think it can be better? (it can)
+well... talk is easy, send patches
         """
     )
 
 
 # Business logic for payment records.
-def paid_for_group():
-    return
+
+nums = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+
+def paid_for_group(data):
+    print(data["text"].split())
+    text_list: list[str] = data["text"].split()
+
+    amount_paid: float = None
+    debtors: list[str] = []
+    debtors_id: list[int] = []
+
+    # This loop extracts keywords from the text sent by the user to extract useful info.
+    #
+    for text in text_list:
+        if text.startswith("$"):
+            amount_paid = round(float(text[1:]), 2)
+
+        if text.startswith("@"):
+            debtors.append(text[1:])
+
+    if amount_paid is None:
+        return "Yeah...how much tho? Try that again\nLost? Get /help"
+    if len(debtors) == 0:
+        return "Yeah...for whom tho? Try that again\nLost? Get /help"
+
+    amount_for_each: float = round(amount_paid / len(debtors), 2)
+
+    search_debtor_ids_sql = "SELECT * FROM Users WHERE username=?;"
+    for debtor in debtors:
+        search_debtor_res = cursor.execute(search_debtor_ids_sql, (debtor,))
+        if search_debtor_res is None:
+            return "One of these debtors aren't registered. \nWhat did I say about registering?\nGet them to register."
+        else:
+            debtors_id.append(search_debtor_res[0])
+
+    insert_debt_sql = (
+        "INSERT INTO Debts (debtee_id, debtor_id, group_id, amount) VALUES (?,?,?,?);"
+    )
+    for debtor_id in debtors_id:
+        cursor.execute(
+            insert_debt_sql,
+            (
+                data["current_user_id"],
+                debtor_id,
+                data["chat_id"],
+                amount_for_each,
+            ),
+        )
+
+    print(amount_paid)
+    print(debtors)
+    print(f"Amount for each: {amount_for_each}")
+    return f"You paid {amount_paid}"
 
 
 def received_payment():
@@ -126,14 +183,23 @@ def parse_message(text, chat_id, current_username, current_user_id):
     if BOT_USERNAME in text:
         text: str = text.replace(BOT_USERNAME, "").strip()
     text: str = text.lower()
+
+    data = {
+        "text": text,
+        "chat_id": chat_id,
+        "current_username": current_username,
+        "current_user_id": current_user_id,
+    }
+
     if "hello" in text:
         hello_str: str = (
             f"chat ID: {chat_id}\nUsername: @{current_username}\nUserID: {current_user_id}"
         )
         return hello_str
     if "i paid" in text:
-        print(f"PROCESSED TEXT: {text}")
-        return "your payment was recorded."
+        res = paid_for_group(data)
+        # print(f"PROCESSED TEXT: {text}")
+        return res
     if "paid me" in text:
         return "okay, debt cleared"
     if "how much do i owe" in text:
