@@ -125,7 +125,7 @@ User IDs are immutable and unique, but discord users don't know their friends' u
 
 At the moment there are syntax issues which I ignore. You can input the wrong records easily.
 
-Expect bugs.
+Expect bugs. Report them on my AccountantShark thread on https://forum.bladerunners.net
             """
     )
 
@@ -158,7 +158,7 @@ def paid_for_group(data):
     for debtor in debtors:
         search_debtor_res = cursor.execute(search_debtor_sql, (debtor,))
         parsed_res = search_debtor_res.fetchone()
-        truth = parsed_res is None
+        print(f"PARSED RESPONSE, SEARCH OF DEBTOR: {parsed_res}")
         if parsed_res is None:
             return "One of these debtors aren't registered. \nWhat did I say about registering?\nGet them to register."
         else:
@@ -257,13 +257,14 @@ def received_payment(data):
     return f"Payment recorded.\n@{debtor_username} now owes you ${new_balance}"
 
 
-def debts():
-    # Check Debts table for all debtor_id == current_user_id group by debtee_id AND group_id
-    # If none, return that the user has no debts owing
-    # Create list of dicts with each dict name as debtee_username and one kv pair debt: int.
-    # Create a string to input the list of debtees and debt to them
-    # Return that string
-    return
+def debts(data):
+    # Get all transactions other users made to user where groupid is chatid and payeeid is userid, sum amount grouped by other usersid, deduct all transactions made to other users where payorid is userid, groupid is chatid, and sum amount grouped by other usersid.
+    get_all_user_debts_sql = "SELECT * FROM Transactions WHERE payee_id=?"
+    get_all_user_debts_execute = cursor.execute(
+        get_all_user_debts_sql, (int(data["current_user_id"]),)
+    )
+
+    return "You owe this much: $10000000"
 
 
 def owed():
@@ -276,9 +277,10 @@ def owed():
 
 
 def parse_message(text, chat_id, current_username, current_user_id):
-    if BOT_USERNAME in text:
-        text: str = text.replace(BOT_USERNAME, "").strip()
-    text: str = text.lower()
+
+    text = " ".join(
+        word if word.startswith("@") else word.lower() for word in text.split()
+    )
 
     data = {
         "text": text,
@@ -292,17 +294,19 @@ def parse_message(text, chat_id, current_username, current_user_id):
             f"chat ID: {chat_id}\nUsername: @{current_username}\nUserID: {current_user_id}"
         )
         return hello_str
-    if "i paid" in text:
-        res = paid_for_group(data)
+    elif "i paid $" in text:
+        create_debt_res = paid_for_group(data)
+        return create_debt_res
+    elif "paid me" in text:
+        pay_debt_res = received_payment(data)
+        return pay_debt_res
+    elif "how much do i owe" in text:
+        res = debts(data)
         return res
-    if "paid me" in text:
-        res = received_payment(data)
-        return res
-    if "how much do i owe" in text:
-        return "you owe ..."
-    if "owes me" in text:
+    elif "owes me" in text:
         return "this user owes you"
-    return "Sorry I don't understand"
+    else:
+        return "Sorry I don't understand"
 
 
 # messages should be parsed in handle_mesage function
@@ -322,7 +326,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f'User ({update.message.chat.id}) in {message_type}: "{text}"')
     print(f"{current_username}")
 
-    response: str = parse_message(text, chat_id, current_username, current_user_id)
+    if message_type == "group" or message_type == "supergroup":
+        if BOT_USERNAME in text:
+            text: str = text.replace(BOT_USERNAME, "").strip()
+            response: str = parse_message(
+                text, chat_id, current_username, current_user_id
+            )
+        else:
+            return
+    else:
+        response: str = parse_message(text, chat_id, current_username, current_user_id)
 
     print("BOT:", response)
     await update.message.reply_text(response)
@@ -357,7 +370,7 @@ if __name__ == "__main__":
 # TODO: create function to register users into the db. DONE
 # TODO: create function to register group into the db. DONE
 # TODO: create function to POST new debt. DONE
-# TODO: create function to PUT/UPDATE debt record of one user against another.
+# TODO: create function to PUT/UPDATE debt record of one user against another. DONE
 # TODO: create function to GET debts owed to user.
 # TODO: create function to GET debts owed to others.
 # TODO: need to rename Debts table to Transaction Table.
