@@ -32,6 +32,9 @@ async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_username: str = update.effective_user.username
     current_user_id: int = update.effective_user.id
 
+    if current_username == "None":
+        await update.message.reply_text("I can't work with username 'None'. Sorry.")
+
     user_search_sql = "SELECT * FROM Users WHERE user_id=?;"
     user_search = cursor.execute(user_search_sql, (current_user_id,))
     if user_search.fetchone() is None:
@@ -95,13 +98,8 @@ The debt is cleared once the debt is 0.
 
 DO NOT tag me when clearing debt, your debtor will do it as above 
 
-Not sure how much you owe? -
-Send "@AccountantShark how much do I owe?"
-I'll tell you who you owe and how much.
-
-Not sure who owes you? -
-Send "@AccountantShark who owes me?"
-I'll tell you who owes you and how much. 
+Want to check your records?
+Send "@AccountantShark check"
 
 want to build useful bots or contribute to the project? connect with us on https://forum.bladerunners.net
 
@@ -119,9 +117,10 @@ async def limitations_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 I have serious limitations.
 
 For example, telegram users can only tag their friends via usernames "eg @user1"
-But usernames are not unique, and are not immutable. 
+But usernames are not unique, and are not immutable. This means that data can be lost or corrupted if a user changes their username. 
+Some users don't have a username, and are "None". I cannot operate properly if a user has "None".
 
-User IDs are immutable and unique, but discord users don't know their friends' user ID and it is not intuitive to use. 
+User IDs are immutable and unique, but telegram users don't know their friends' user ID and it is not intuitive to use. 
 
 At the moment there are syntax issues which I ignore. You can input the wrong records easily.
 
@@ -259,21 +258,50 @@ def received_payment(data):
 
 def debts(data):
     # Get all transactions other users made to user where groupid is chatid and payeeid is userid, sum amount grouped by other usersid, deduct all transactions made to other users where payorid is userid, groupid is chatid, and sum amount grouped by other usersid.
-    get_all_user_debts_sql = "SELECT * FROM Transactions WHERE payee_id=?"
+    # get_all_user_debts_sql = "SELECT debts_table.debts_owing - debts_paid_table.debts_paid, debts_table.payor_id FROM (SELECT payor_id, COALESCE(SUM(amount),0) AS debts_owing FROM Transactions WHERE payee_id=? GROUP BY payor_id) AS debts_table FULL OUTER JOIN (SELECT payee_id, COALESCE(SUM(amount),0) AS debts_paid FROM Transactions WHERE payor_id=? GROUP BY payee_id) AS debts_paid_table ON debts_table.payor_id = debts_paid_table.payee_id;"
+    # get_all_user_debts_execute = cursor.execute(
+    #     get_all_user_debts_sql,
+    #     (
+    #         int(data["current_user_id"]),
+    #         int(data["current_user_id"]),
+    #     ),
+    # )
+    get_all_user_debts_sql = "SELECT COALESCE(debts_table.debts_owing, 0) - COALESCE(debts_paid_table.debts_paid, 0) AS net_balance, COALESCE(debts_table.payor_id, debts_paid_table.payee_id) AS user_id FROM (SELECT payor_id, COALESCE(SUM(amount), 0) AS debts_owing FROM Transactions WHERE payee_id = :current_user_id AND group_id = :group_id GROUP BY payor_id) AS debts_table LEFT JOIN (SELECT payee_id, COALESCE(SUM(amount), 0) AS debts_paid FROM Transactions WHERE payor_id = :current_user_id AND group_id = :group_id GROUP BY payee_id) AS debts_paid_table ON debts_table.payor_id = debts_paid_table.payee_id UNION SELECT -COALESCE(debts_paid_table.debts_paid, 0) AS net_balance,debts_paid_table.payee_id AS user_id FROM (SELECT payee_id, COALESCE(SUM(amount), 0) AS debts_paid FROM Transactions WHERE payor_id = :current_user_id AND group_id = :group_id GROUP BY payee_id) AS debts_paid_table LEFT JOIN (SELECT payor_id, COALESCE(SUM(amount), 0) AS debts_owing FROM Transactions WHERE payee_id = :current_user_id AND group_id = :group_id GROUP BY payor_id) AS debts_table ON debts_paid_table.payee_id = debts_table.payor_id WHERE debts_table.payor_id IS NULL;"
     get_all_user_debts_execute = cursor.execute(
-        get_all_user_debts_sql, (int(data["current_user_id"]),)
+        get_all_user_debts_sql,
+        {
+            "current_user_id": int(data["current_user_id"]),
+            "group_id": int(data["chat_id"]),
+        },
     )
+    get_all_user_debts_res = get_all_user_debts_execute.fetchall()
 
-    return "You owe this much: $10000000"
+    debts_dict = {}
+    for row in get_all_user_debts_res:
+        print(f"ROW: {row}")
+        row_user_id = row[1]
+        print(f"ROW USER ID = {row_user_id}")
+        get_usernames = cursor.execute(
+            f"SELECT username FROM Users WHERE user_id={row_user_id}"
+        )
+        row_username = get_usernames.fetchone()[0]
+        print(row_username)
+        debts_dict[row_username] = row[0]
+    print(debts_dict)
 
+    response_string_list = []
+    for key, value in debts_dict.items():
+        if value == 0:
+            continue
+        elif value < 0:
+            value *= -1
+            response_string_list.append(f"\n- @{key} owes you ${value}")
+        else:
+            response_string_list.append(f"\n- You owe ${value} to @{key}")
+    if len(response_string_list) == 0:
+        return "You have no debts nor does anyone owe you money. \nGrats, bitch"
 
-def owed():
-    # Check Debts table for all debtee_id == current_user_id group by debtor_id AND group_id
-    # If none, return that the user has no debts owed
-    # Create list of dicts with each dict name as debtor_username and one kv pair debt: int.
-    # Create a string to input the list of debtors and debt owed
-    # Return that string
-    return
+    return f"Here you go:\n {''.join(response_string_list)}"
 
 
 def parse_message(text, chat_id, current_username, current_user_id):
@@ -300,11 +328,9 @@ def parse_message(text, chat_id, current_username, current_user_id):
     elif "paid me" in text:
         pay_debt_res = received_payment(data)
         return pay_debt_res
-    elif "how much do i owe" in text:
+    elif "check" in text:
         res = debts(data)
         return res
-    elif "owes me" in text:
-        return "this user owes you"
     else:
         return "Sorry I don't understand"
 
@@ -335,8 +361,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             return
     else:
-        response: str = parse_message(text, chat_id, current_username, current_user_id)
-
+        return
     print("BOT:", response)
     await update.message.reply_text(response)
 
@@ -350,7 +375,7 @@ if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
 
     # COMMANDS forward slashes for specific commands
-    app.add_handler(CommandHandler("start", start_command))
+    # app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("register", register_command))
     app.add_handler(CommandHandler("limitations", limitations_command))
