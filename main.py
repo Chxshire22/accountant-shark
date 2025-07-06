@@ -139,13 +139,17 @@ def paid_for_group(data):
 
     amount_for_each: float = round(amount_paid / len(debtors), 2)
 
-    search_debtor_ids_sql = "SELECT * FROM Users WHERE username=?;"
+    search_debtor_sql = "SELECT * FROM Users WHERE username=?;"
     for debtor in debtors:
-        search_debtor_res = cursor.execute(search_debtor_ids_sql, (debtor,))
-        if search_debtor_res is None:
+        search_debtor_res = cursor.execute(search_debtor_sql, (debtor,))
+        parsed_res = search_debtor_res.fetchone()
+        print(parsed_res)
+        truth = parsed_res is None
+        print(f"TRUTH:{truth}")
+        if parsed_res is None:
             return "One of these debtors aren't registered. \nWhat did I say about registering?\nGet them to register."
         else:
-            debtors_id.append(search_debtor_res[0])
+            debtors_id.append(parsed_res[0])
 
     insert_debt_sql = (
         "INSERT INTO Debts (debtee_id, debtor_id, group_id, amount) VALUES (?,?,?,?);"
@@ -154,9 +158,9 @@ def paid_for_group(data):
         cursor.execute(
             insert_debt_sql,
             (
-                data["current_user_id"],
+                int(data["current_user_id"]),
                 debtor_id,
-                data["chat_id"],
+                int(data["chat_id"]),
                 amount_for_each,
             ),
         )
@@ -164,6 +168,7 @@ def paid_for_group(data):
     print(amount_paid)
     print(debtors)
     print(f"Amount for each: {amount_for_each}")
+    connection.commit()
     return f"You paid {amount_paid}"
 
 
