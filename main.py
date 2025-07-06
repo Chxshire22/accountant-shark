@@ -104,19 +104,35 @@ Send "@AccountantShark who owes me?"
 I'll tell you who owes you and how much. 
 
 want to build useful bots or contribute to the project? connect with us on https://forum.bladerunners.net
+
+this was built over the weekend without the help of AI.
+see /limitations
 think it can be better? (it can)
 well... talk is easy, send patches
         """
     )
 
 
+async def limitations_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        """
+I have serious limitations.
+
+For example, telegram users can only tag their friends via usernames "eg @user1"
+But usernames are not unique, and are not immutable. 
+
+User IDs are immutable and unique, but discord users don't know their friends' user ID and it is not intuitive to use. 
+
+At the moment there are syntax issues which I ignore. You can input the wrong records easily.
+
+Expect bugs.
+            """
+    )
+
+
 # Business logic for payment records.
-
-nums = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-
-
+# English def clarifications: Payor in DB means someone who pays. Debtee means someone who a debt is owed to. So if someone paid for the group he is the Payor and also the Debtee.
 def paid_for_group(data):
-    print(data["text"].split())
     text_list: list[str] = data["text"].split()
 
     amount_paid: float = None
@@ -124,7 +140,6 @@ def paid_for_group(data):
     debtors_id: list[int] = []
 
     # This loop extracts keywords from the text sent by the user to extract useful info.
-    #
     for text in text_list:
         if text.startswith("$"):
             amount_paid = round(float(text[1:]), 2)
@@ -143,17 +158,13 @@ def paid_for_group(data):
     for debtor in debtors:
         search_debtor_res = cursor.execute(search_debtor_sql, (debtor,))
         parsed_res = search_debtor_res.fetchone()
-        print(parsed_res)
         truth = parsed_res is None
-        print(f"TRUTH:{truth}")
         if parsed_res is None:
             return "One of these debtors aren't registered. \nWhat did I say about registering?\nGet them to register."
         else:
             debtors_id.append(parsed_res[0])
 
-    insert_debt_sql = (
-        "INSERT INTO Debts (debtee_id, debtor_id, group_id, amount) VALUES (?,?,?,?);"
-    )
+    insert_debt_sql = "INSERT INTO Transactions (payor_id, payee_id, group_id, amount) VALUES (?,?,?,?);"
     for debtor_id in debtors_id:
         cursor.execute(
             insert_debt_sql,
@@ -169,16 +180,81 @@ def paid_for_group(data):
     print(debtors)
     print(f"Amount for each: {amount_for_each}")
     connection.commit()
-    return f"I've recorded the payment. They each owe {amount_for_each}"
+    return f"I've recorded the payment."
 
 
 def received_payment(data):
+    text_list: list[str] = data["text"].split()
+    debtor_username: str = None
+    debtor_id: int = None
+    debt_paid: float = None
+    debtee_username: str = data["current_username"]
+    debt_balance: float = None
 
-    # Check if debtor exists
+    for text in text_list:
+        if text.startswith("@"):
+            debtor_username = text[1:]
+        if text.startswith("$"):
+            debt_paid = round(float(text[1:]), 2)
+
+    # Get debtor user_id
+    debtor_id_search_sql = "SELECT * FROM Users WHERE username=?;"
+    debtor_id_search_execute = cursor.execute(debtor_id_search_sql, (debtor_username,))
+    debtor_id_search_res = debtor_id_search_execute.fetchone()
+    if debtor_id_search_res is None:
+        return f"@{debtor_username} does not exist."
+
+    debtor_id = debtor_id_search_res[0]
+    print(debtor_id)
+
     # Check the debt record, and the amount.
-    # amount >= debt record? debt record 0,then delete that row and send response that debt is cleared : debt record - amount, then send the balance debt
+    debt_balance_sql = "SELECT (COALESCE((SELECT SUM(amount) FROM Transactions WHERE payor_id=? AND payee_id=?),0) - COALESCE((SELECT SUM(amount) from Transactions WHERE payor_id=? AND payee_id=?),0));"
 
-    return "I've updated the debt"
+    debt_balance_execute = cursor.execute(
+        debt_balance_sql,
+        (
+            data["current_user_id"],
+            debtor_id,
+            debtor_id,
+            data["current_user_id"],
+        ),
+    )
+    curr_debt_balance_res = debt_balance_execute.fetchone()
+    curr_balance: int = curr_debt_balance_res[0]
+    print(f"CURRENT BALANCE: {curr_balance}")
+
+    # Create payment record of debtor (as payor) to debtee (as payee)
+    if curr_balance == 0:
+        return f"@{debtor_username} doesn't even owe you money tf?"
+    if debt_paid > curr_balance:
+        return f"Can you bffr, @{debtor_username}'s debt to you is ${curr_balance} which is lower than ${debt_paid}.\nAre you trying to error me out?"
+    insert_debt_payment_sql = "INSERT INTO Transactions (payor_id, payee_id,group_id,amount) VALUES (?,?,?,?);"
+    insert_debt_payment_execute = cursor.execute(
+        insert_debt_payment_sql,
+        (
+            debtor_id,
+            int(data["current_user_id"]),
+            int(data["chat_id"]),
+            debt_paid,
+        ),
+    )
+    connection.commit()
+
+    debt_balance_execute = cursor.execute(
+        debt_balance_sql,
+        (
+            data["current_user_id"],
+            debtor_id,
+            debtor_id,
+            data["current_user_id"],
+        ),
+    )
+    new_debt_balance_res = debt_balance_execute.fetchone()
+    new_balance: int = new_debt_balance_res[0]
+    print(f"NEW BALANCE {new_balance}")
+    if new_balance == 0:
+        return f"Payment recorded.\n@{debtor_username} has cleared all their debts with you."
+    return f"Payment recorded.\n@{debtor_username} now owes you ${new_balance}"
 
 
 def debts():
@@ -218,7 +294,6 @@ def parse_message(text, chat_id, current_username, current_user_id):
         return hello_str
     if "i paid" in text:
         res = paid_for_group(data)
-        # print(f"PROCESSED TEXT: {text}")
         return res
     if "paid me" in text:
         res = received_payment(data)
@@ -265,6 +340,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("register", register_command))
+    app.add_handler(CommandHandler("limitations", limitations_command))
 
     # MESSAGES
     app.add_handler(MessageHandler(filters.TEXT, handle_message))
@@ -284,3 +360,4 @@ if __name__ == "__main__":
 # TODO: create function to PUT/UPDATE debt record of one user against another.
 # TODO: create function to GET debts owed to user.
 # TODO: create function to GET debts owed to others.
+# TODO: need to rename Debts table to Transaction Table.
