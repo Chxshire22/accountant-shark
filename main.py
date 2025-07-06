@@ -169,18 +169,33 @@ def paid_for_group(data):
     print(debtors)
     print(f"Amount for each: {amount_for_each}")
     connection.commit()
-    return f"You paid {amount_paid}"
+    return f"I've recorded the payment. They each owe {amount_for_each}"
 
 
-def received_payment():
-    return
+def received_payment(data):
+
+    # Check if debtor exists
+    # Check the debt record, and the amount.
+    # amount >= debt record? debt record 0,then delete that row and send response that debt is cleared : debt record - amount, then send the balance debt
+
+    return "I've updated the debt"
 
 
 def debts():
+    # Check Debts table for all debtor_id == current_user_id group by debtee_id AND group_id
+    # If none, return that the user has no debts owing
+    # Create list of dicts with each dict name as debtee_username and one kv pair debt: int.
+    # Create a string to input the list of debtees and debt to them
+    # Return that string
     return
 
 
 def owed():
+    # Check Debts table for all debtee_id == current_user_id group by debtor_id AND group_id
+    # If none, return that the user has no debts owed
+    # Create list of dicts with each dict name as debtor_username and one kv pair debt: int.
+    # Create a string to input the list of debtors and debt owed
+    # Return that string
     return
 
 
@@ -206,7 +221,8 @@ def parse_message(text, chat_id, current_username, current_user_id):
         # print(f"PROCESSED TEXT: {text}")
         return res
     if "paid me" in text:
-        return "okay, debt cleared"
+        res = received_payment(data)
+        return res
     if "how much do i owe" in text:
         return "you owe ..."
     if "owes me" in text:
@@ -264,7 +280,7 @@ if __name__ == "__main__":
 # <leader>xx shows all the linting issues...
 # TODO: create function to register users into the db. DONE
 # TODO: create function to register group into the db. DONE
-# TODO: create function to POST new debt
+# TODO: create function to POST new debt. DONE
 # TODO: create function to PUT/UPDATE debt record of one user against another.
 # TODO: create function to GET debts owed to user.
 # TODO: create function to GET debts owed to others.
