@@ -23,7 +23,7 @@ cursor = connection.cursor()
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "I start automatically, but make sure that everyone participating registers with '/register'\nUse '/help' to learn how to use me."
+        "Add me to a group chat, give me admin privileges so I can receive and send texts.\nIMPORTANT - make sure that everyone participating registers with '/register'\nUse '/help' to learn how to use me."
     )
 
 
@@ -99,6 +99,8 @@ The debt is cleared once the debt is 0.
 Want to check your records?
 Send "@AccountantShark check"
 
+I only record in $ amounts at the moment. Currency exchange will be added in the future. 
+
 want to build useful bots or contribute to the project? connect with us on https://forum.bladerunners.net
 
 this was built over the weekend without the help of AI.
@@ -117,6 +119,8 @@ I have serious limitations.
 For example, telegram users can only tag their friends via usernames "eg @user1"
 But usernames are not unique, and are not immutable. This means that data can be lost or corrupted if a user changes their username. 
 Some users don't have a username, and are "None". I cannot operate properly if a user has "None".
+
+Currencies - I only record in $ amounts at the moment. Currency exchange will be added in the future. 
 
 User IDs are immutable and unique, but telegram users don't know their friends' user ID and it is not intuitive to use. 
 
@@ -317,7 +321,8 @@ def parse_message(text, chat_id, current_username, current_user_id):
 
     if "hello" in text:
         hello_str: str = (
-            f"chat ID: {chat_id}\nUsername: @{current_username}\nUserID: {current_user_id}"
+            # f"chat ID: {chat_id}\nUsername: @{current_username}\nUserID: {current_user_id}"
+            f"Hi @{current_username}, what's up what's UUUP \n(I'm not a chatbot - I only record debts)"
         )
         return hello_str
     elif "i paid $" in text:
@@ -374,7 +379,7 @@ if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
 
     # COMMANDS forward slashes for specific commands
-    # app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("register", register_command))
     app.add_handler(CommandHandler("limitations", limitations_command))
