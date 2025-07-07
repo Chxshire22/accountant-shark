@@ -87,16 +87,14 @@ What do I do?  I record payments made by users, for their friends in the group c
 
 Due to Telegram's security measures I need everyone participating to do /register.
 
-Paid for your friend/s? - 
-Send me the information in this format: '@AccountantShark I paid $89 for @user1 @user2 @user3.'
+Paid for or to your friend/s? - 
+Send me the information in this format: '@AccountantShark I paid $89 for @user1 @user2 @user3.' or '@AccountantShark I paid $10 to @user1'
 This will record the amount spent, and split it between the different users.
 
 Got paid what you're owed? -
 Send "@AccountantShark @user paid me $X" 
 I'll check if they exist, owe you that much or more, then deduct it from the balance.
 The debt is cleared once the debt is 0. 
-
-DO NOT tag me when clearing debt, your debtor will do it as above 
 
 Want to check your records?
 Send "@AccountantShark check"
@@ -197,7 +195,7 @@ def received_payment(data):
             debt_paid = round(float(text[1:]), 2)
 
     # Get debtor user_id
-    debtor_id_search_sql = "SELECT * FROM Users WHERE username=?;"
+    debtor_id_search_sql = "SELECT * FROM User_Groups WHERE username=?;"
     debtor_id_search_execute = cursor.execute(debtor_id_search_sql, (debtor_username,))
     debtor_id_search_res = debtor_id_search_execute.fetchone()
     if debtor_id_search_res is None:
@@ -299,7 +297,7 @@ def debts(data):
         else:
             response_string_list.append(f"\n- You owe ${value} to @{key}")
     if len(response_string_list) == 0:
-        return "You have no debts nor does anyone owe you money. \nGrats, bitch"
+        return "You have no debts nor does anyone owe you money. \nGrats, choom"
 
     return f"Here you go:\n {''.join(response_string_list)}"
 
@@ -362,6 +360,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
     else:
         return
+
     print("BOT:", response)
     await update.message.reply_text(response)
 
@@ -396,6 +395,8 @@ if __name__ == "__main__":
 # TODO: create function to register group into the db. DONE
 # TODO: create function to POST new debt. DONE
 # TODO: create function to PUT/UPDATE debt record of one user against another. DONE
-# TODO: create function to GET debts owed to user.
-# TODO: create function to GET debts owed to others.
-# TODO: need to rename Debts table to Transaction Table.
+# TODO: create function to GET debts owed to user. DONE
+# TODO: create function to GET debts owed to others. DONE
+# TODO: need to rename Debts table to Transaction Table. DONE
+# TODO: need to fix the ability to pay for and to someone outside of the groupchat.
+# TODO: needs refactoring of code, some repeated code, need modularization and documentation
