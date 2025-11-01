@@ -1,1 +1,5 @@
 .env
+#obviously don't upload the whole sqlite doc lol
+tele_shark.db
+#this one was my file holding older code lol. don't want to delete it on the server, and don't want to upload it
+backup.txt

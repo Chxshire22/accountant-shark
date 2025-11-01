@@ -1,13 +1,23 @@
 import math
+import os
 import sqlite3
 from typing import Final
 
+from dotenv import load_dotenv
 from telegram import Chat, ChatMember, ChatMemberUpdated, Update
-from telegram.ext import (Application, ApplicationBuilder, CommandHandler,
-                          ContextTypes, MessageHandler, filters)
+from telegram.ext import (
+    Application,
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
+
+load_dotenv()
 
 # TELEGRAM
-TOKEN: Final = "7691516733:AAF8xN3UuK55jte-Yv1mbRilgxzUwNcd9rE"
+TOKEN: Final = os.getenv("BOT_TOKEN")
 BOT_USERNAME: Final = "@AccountantSharkbot"
 
 # DB Connection
