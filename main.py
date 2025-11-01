@@ -3,14 +3,8 @@ import sqlite3
 from typing import Final
 
 from telegram import Chat, ChatMember, ChatMemberUpdated, Update
-from telegram.ext import (
-    Application,
-    ApplicationBuilder,
-    CommandHandler,
-    ContextTypes,
-    MessageHandler,
-    filters,
-)
+from telegram.ext import (Application, ApplicationBuilder, CommandHandler,
+                          ContextTypes, MessageHandler, filters)
 
 # TELEGRAM
 TOKEN: Final = "7691516733:AAF8xN3UuK55jte-Yv1mbRilgxzUwNcd9rE"
@@ -259,15 +253,6 @@ def received_payment(data):
 
 
 def debts(data):
-    # Get all transactions other users made to user where groupid is chatid and payeeid is userid, sum amount grouped by other usersid, deduct all transactions made to other users where payorid is userid, groupid is chatid, and sum amount grouped by other usersid.
-    # get_all_user_debts_sql = "SELECT debts_table.debts_owing - debts_paid_table.debts_paid, debts_table.payor_id FROM (SELECT payor_id, COALESCE(SUM(amount),0) AS debts_owing FROM Transactions WHERE payee_id=? GROUP BY payor_id) AS debts_table FULL OUTER JOIN (SELECT payee_id, COALESCE(SUM(amount),0) AS debts_paid FROM Transactions WHERE payor_id=? GROUP BY payee_id) AS debts_paid_table ON debts_table.payor_id = debts_paid_table.payee_id;"
-    # get_all_user_debts_execute = cursor.execute(
-    #     get_all_user_debts_sql,
-    #     (
-    #         int(data["current_user_id"]),
-    #         int(data["current_user_id"]),
-    #     ),
-    # )
     get_all_user_debts_sql = "SELECT COALESCE(debts_table.debts_owing, 0) - COALESCE(debts_paid_table.debts_paid, 0) AS net_balance, COALESCE(debts_table.payor_id, debts_paid_table.payee_id) AS user_id FROM (SELECT payor_id, COALESCE(SUM(amount), 0) AS debts_owing FROM Transactions WHERE payee_id = :current_user_id AND group_id = :group_id GROUP BY payor_id) AS debts_table LEFT JOIN (SELECT payee_id, COALESCE(SUM(amount), 0) AS debts_paid FROM Transactions WHERE payor_id = :current_user_id AND group_id = :group_id GROUP BY payee_id) AS debts_paid_table ON debts_table.payor_id = debts_paid_table.payee_id UNION SELECT -COALESCE(debts_paid_table.debts_paid, 0) AS net_balance,debts_paid_table.payee_id AS user_id FROM (SELECT payee_id, COALESCE(SUM(amount), 0) AS debts_paid FROM Transactions WHERE payor_id = :current_user_id AND group_id = :group_id GROUP BY payee_id) AS debts_paid_table LEFT JOIN (SELECT payor_id, COALESCE(SUM(amount), 0) AS debts_owing FROM Transactions WHERE payee_id = :current_user_id AND group_id = :group_id GROUP BY payor_id) AS debts_table ON debts_paid_table.payee_id = debts_table.payor_id WHERE debts_table.payor_id IS NULL;"
     get_all_user_debts_execute = cursor.execute(
         get_all_user_debts_sql,
