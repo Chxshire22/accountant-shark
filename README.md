@@ -2,7 +2,7 @@
 
 **@AccountantSharkbot** on telegram.
 
-listen. i built this over the weekend. without ai (or at least that's what i remember it's been a couple months but im pretty sure without ai). so it's probably full of shit code.
+listen. i built this over the weekend. so it's probably full of shit code.
 it's not modularized in different files for "separation of concerns".
 it doesn't cover all edge cases probably.
 
