@@ -1,0 +1,24 @@
+What do I do?  I record payments made by users, for their friends in the group chat.
+
+Due to Telegram's security measures I need everyone participating to do /register.
+
+Paid for or to your friend/s? - 
+Send me the information in this format: '@AccountantShark I paid $89 for @user1 @user2 @user3.' or '@AccountantShark I paid $10 to @user1'
+This will record the amount spent, and split it between the different users.
+
+Got paid what you're owed? -
+Send "@AccountantShark @user paid me $X" 
+I'll check if they exist, owe you that much or more, then deduct it from the balance.
+The debt is cleared once the debt is 0. 
+
+Want to check your records?
+Send "@AccountantShark check"
+
+I only record in $ amounts at the moment. Currency exchange will be added in the future. 
+
+want to build useful bots or contribute to the project? connect with us on https://forum.bladerunners.net
+
+this was built over the weekend without the help of AI.
+see /limitations
+think it can be better? (it can)
+well... talk is easy, send patches

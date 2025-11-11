@@ -1,7 +1,9 @@
 import sqlite3
 
-connection = sqlite3.connect("tele_shark.db")
-cursor = connection.cursor()
+
+DB_CONNECTION = sqlite3.connect("tele_shark.db")
+DB_CURSOR = DB_CONNECTION.cursor()
+
 
 drop_user_table = "DROP TABLE IF EXISTS Users"
 drop_group_table = "DROP TABLE IF EXISTS Groups"
@@ -37,4 +39,4 @@ commands_list = [
 print(commands_list)
 
 for command in commands_list:
-    cursor.execute(command)
+    DB_CURSOR.execute(command)
