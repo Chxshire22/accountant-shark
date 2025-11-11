@@ -1,0 +1,13 @@
+I have serious limitations.
+
+For example, telegram users can only tag their friends via usernames "eg @user1"
+But usernames are not unique, and are not immutable. This means that data can be lost or corrupted if a user changes their username. 
+Some users don't have a username, and are "None". I cannot operate properly if a user has "None".
+
+Currencies - I only record in $ amounts at the moment. Currency exchange will be added in the future. 
+
+User IDs are immutable and unique, but telegram users don't know their friends' user ID and it is not intuitive to use. 
+
+At the moment there are syntax issues which I ignore. You can input the wrong records easily.
+
+Expect bugs. Report them on my AccountantShark thread on https://forum.bladerunners.net

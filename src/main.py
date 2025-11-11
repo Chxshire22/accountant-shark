@@ -1,8 +1,7 @@
 import math
 import os
-import sqlite3
-from typing import Final
 
+import sqlite3
 from dotenv import load_dotenv
 from telegram import Chat, ChatMember, ChatMemberUpdated, Update
 from telegram.ext import (
@@ -14,15 +13,31 @@ from telegram.ext import (
     filters,
 )
 
+import sql_commands as sqlcmds
+
+
 load_dotenv()
 
-# TELEGRAM
-TOKEN: Final = os.getenv("BOT_TOKEN")
-BOT_USERNAME: Final = "@AccountantSharkbot"
 
-# DB Connection
-connection = sqlite3.connect("tele_shark.db")
-cursor = connection.cursor()
+# Constants
+TELEGRAM_TOKEN = os.getenv("BOT_TOKEN")
+TELEGRAM_USERNAME = "@AccountantSharkbot"
+DB_CONNECTION = sqlite3.connect("tele_shark.db")
+DB_CURSOR = DB_CONNECTION.cursor()
+HELP_PATH = os.path.join("resources", "help.txt")
+LIMITS_PATH = os.path.join("resources", "limits.txt")
+
+
+# Functions
+def main():
+	app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+	app.add_handler(CommandHandler("start", start_command))
+	app.add_handler(CommandHandler("help", help_command))
+	app.add_handler(CommandHandler("register", register_command))
+	app.add_handler(CommandHandler("limitations", limitations_command))
+	app.add_handler(MessageHandler(filters.TEXT, handle_message))
+	app.add_error_handler(error)
+	app.run_polling(poll_interval=3)
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -39,42 +54,39 @@ async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if current_username == "None":
         await update.message.reply_text("I can't work with username 'None'. Sorry.")
 
-    user_search_sql = "SELECT * FROM Users WHERE user_id=?;"
-    user_search = cursor.execute(user_search_sql, (current_user_id,))
+    user_search = DB_CURSOR.execute(sqlcmds.SEARCH_BY_USER_ID, (current_user_id,))
     if user_search.fetchone() is None:
-        sql = "INSERT INTO Users (user_id, username) VALUES (?,?);"
-        cursor.execute(
-            sql,
+        CURDB_CURSORSOR.execute(
+            sqlcmds.INSERT_USERNAME_AND_USER_ID,
             (
                 current_user_id,
                 current_username,
             ),
         )
 
-    chat_search_sql = "SELECT * FROM Groups WHERE group_id=?;"
-    chat_search = cursor.execute(chat_search_sql, (chat_id,))
+    chat_search = DB_CURSOR.execute(sqlcmds.SEARCH_BY_GROUP_ID, (chat_id,))
     if chat_search.fetchone() is None:
-        sql = "INSERT INTO Groups (group_id) VALUES (?);"
-        cursor.execute(sql, (chat_id,))
+        DB_CURSOR.execute(
+        	sqlcmds.INSERT_GROUP_ID, 
+        	(chat_id,)
+        )
 
-    user_groups_search_sql = "SELECT * FROM User_Groups WHERE user_id=? AND group_id=?;"
-    user_groups_search = cursor.execute(
-        user_groups_search_sql,
+    user_groups_search = DB_CURSOR.execute(
+        sqlcmds.SEARCH_BY_GROUP_ID_AND_USER_ID,
         (
             current_user_id,
             chat_id,
         ),
     )
     if user_groups_search.fetchone() is None:
-        sql = "INSERT INTO User_Groups (user_id,group_id) VALUES (?, ?);"
-        cursor.execute(
-            sql,
+        DB_CURSOR.execute(
+            sqlcmds.INSERT_USER_ID_AND_GROUP_ID,
             (
                 current_user_id,
                 chat_id,
             ),
         )
-        connection.commit()
+        DB_CONNECTION.commit()
         await update.message.reply_text(
             f"@{current_username}'s record for this group is created."
         )
@@ -85,54 +97,13 @@ async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        """
-What do I do?  I record payments made by users, for their friends in the group chat.
-
-Due to Telegram's security measures I need everyone participating to do /register.
-
-Paid for or to your friend/s? - 
-Send me the information in this format: '@AccountantShark I paid $89 for @user1 @user2 @user3.' or '@AccountantShark I paid $10 to @user1'
-This will record the amount spent, and split it between the different users.
-
-Got paid what you're owed? -
-Send "@AccountantShark @user paid me $X" 
-I'll check if they exist, owe you that much or more, then deduct it from the balance.
-The debt is cleared once the debt is 0. 
-
-Want to check your records?
-Send "@AccountantShark check"
-
-I only record in $ amounts at the moment. Currency exchange will be added in the future. 
-
-want to build useful bots or contribute to the project? connect with us on https://forum.bladerunners.net
-
-this was built over the weekend without the help of AI.
-see /limitations
-think it can be better? (it can)
-well... talk is easy, send patches
-        """
-    )
+    with open(HELP_PATH, "r") as msg:
+    	await update.message.reply_text(msg.read())
 
 
 async def limitations_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        """
-I have serious limitations.
-
-For example, telegram users can only tag their friends via usernames "eg @user1"
-But usernames are not unique, and are not immutable. This means that data can be lost or corrupted if a user changes their username. 
-Some users don't have a username, and are "None". I cannot operate properly if a user has "None".
-
-Currencies - I only record in $ amounts at the moment. Currency exchange will be added in the future. 
-
-User IDs are immutable and unique, but telegram users don't know their friends' user ID and it is not intuitive to use. 
-
-At the moment there are syntax issues which I ignore. You can input the wrong records easily.
-
-Expect bugs. Report them on my AccountantShark thread on https://forum.bladerunners.net
-            """
-    )
+    with open(LIMITS_PATH, "r") as msg:
+    	await update.message.reply_text(msg.read())
 
 
 # Business logic for payment records.
@@ -159,9 +130,8 @@ def paid_for_group(data):
 
     amount_for_each: float = round(amount_paid / len(debtors), 2)
 
-    search_debtor_sql = "SELECT * FROM Users WHERE username=?;"
     for debtor in debtors:
-        search_debtor_res = cursor.execute(search_debtor_sql, (debtor,))
+        search_debtor_res = DB_CURSOR.execute(sqlcmds.SEARCH_BY_USERNAME, (debtor,))
         parsed_res = search_debtor_res.fetchone()
         print(f"PARSED RESPONSE, SEARCH OF DEBTOR: {parsed_res}")
         if parsed_res is None:
@@ -169,10 +139,9 @@ def paid_for_group(data):
         else:
             debtors_id.append(parsed_res[0])
 
-    insert_debt_sql = "INSERT INTO Transactions (payor_id, payee_id, group_id, amount) VALUES (?,?,?,?);"
     for debtor_id in debtors_id:
-        cursor.execute(
-            insert_debt_sql,
+        DB_CURSOR.execute(
+            sqlcmds.INSERT_DEBT,
             (
                 int(data["current_user_id"]),
                 debtor_id,
@@ -184,7 +153,7 @@ def paid_for_group(data):
     print(amount_paid)
     print(debtors)
     print(f"Amount for each: {amount_for_each}")
-    connection.commit()
+    DB_CONNECTION.commit()
     return f"I've recorded the payment."
 
 
@@ -203,8 +172,10 @@ def received_payment(data):
             debt_paid = round(float(text[1:]), 2)
 
     # Get debtor user_id
-    debtor_id_search_sql = "SELECT * FROM User_Groups WHERE username=?;"
-    debtor_id_search_execute = cursor.execute(debtor_id_search_sql, (debtor_username,))
+    debtor_id_search_execute = DB_CURSOR.execute(
+    	sqlcmds.SEARCH_BY_GROUP_AND_USERNAME, 
+    	(debtor_username,)
+    )
     debtor_id_search_res = debtor_id_search_execute.fetchone()
     if debtor_id_search_res is None:
         return f"@{debtor_username} does not exist."
@@ -213,10 +184,8 @@ def received_payment(data):
     print(debtor_id)
 
     # Check the debt record, and the amount.
-    debt_balance_sql = "SELECT (COALESCE((SELECT SUM(amount) FROM Transactions WHERE payor_id=? AND payee_id=?),0) - COALESCE((SELECT SUM(amount) from Transactions WHERE payor_id=? AND payee_id=?),0));"
-
-    debt_balance_execute = cursor.execute(
-        debt_balance_sql,
+    debt_balance_execute = DB_CURSOR.execute(
+        sqlcmds.GET_DEBT_BALANCE,
         (
             data["current_user_id"],
             debtor_id,
@@ -233,9 +202,8 @@ def received_payment(data):
         return f"@{debtor_username} doesn't even owe you money tf?"
     if debt_paid > curr_balance:
         return f"Can you bffr, @{debtor_username}'s debt to you is ${curr_balance} which is lower than ${debt_paid}.\nAre you trying to error me out?"
-    insert_debt_payment_sql = "INSERT INTO Transactions (payor_id, payee_id,group_id,amount) VALUES (?,?,?,?);"
-    insert_debt_payment_execute = cursor.execute(
-        insert_debt_payment_sql,
+    insert_debt_payment_execute = DB_CURSOR.execute(
+        sqlcmds.INSERT_PAYMENT,
         (
             debtor_id,
             int(data["current_user_id"]),
@@ -243,10 +211,10 @@ def received_payment(data):
             debt_paid,
         ),
     )
-    connection.commit()
+    DB_CONNECTION.commit()
 
-    debt_balance_execute = cursor.execute(
-        debt_balance_sql,
+    debt_balance_execute = DB_CURSOR.execute(
+        sqlcmds.GET_DEBT_BALANCE,
         (
             data["current_user_id"],
             debtor_id,
@@ -263,9 +231,8 @@ def received_payment(data):
 
 
 def debts(data):
-    get_all_user_debts_sql = "SELECT COALESCE(debts_table.debts_owing, 0) - COALESCE(debts_paid_table.debts_paid, 0) AS net_balance, COALESCE(debts_table.payor_id, debts_paid_table.payee_id) AS user_id FROM (SELECT payor_id, COALESCE(SUM(amount), 0) AS debts_owing FROM Transactions WHERE payee_id = :current_user_id AND group_id = :group_id GROUP BY payor_id) AS debts_table LEFT JOIN (SELECT payee_id, COALESCE(SUM(amount), 0) AS debts_paid FROM Transactions WHERE payor_id = :current_user_id AND group_id = :group_id GROUP BY payee_id) AS debts_paid_table ON debts_table.payor_id = debts_paid_table.payee_id UNION SELECT -COALESCE(debts_paid_table.debts_paid, 0) AS net_balance,debts_paid_table.payee_id AS user_id FROM (SELECT payee_id, COALESCE(SUM(amount), 0) AS debts_paid FROM Transactions WHERE payor_id = :current_user_id AND group_id = :group_id GROUP BY payee_id) AS debts_paid_table LEFT JOIN (SELECT payor_id, COALESCE(SUM(amount), 0) AS debts_owing FROM Transactions WHERE payee_id = :current_user_id AND group_id = :group_id GROUP BY payor_id) AS debts_table ON debts_paid_table.payee_id = debts_table.payor_id WHERE debts_table.payor_id IS NULL;"
-    get_all_user_debts_execute = cursor.execute(
-        get_all_user_debts_sql,
+    get_all_user_debts_execute = DB_CURSOR.execute(
+        sqlcmds.GET_USER_DEBTS,
         {
             "current_user_id": int(data["current_user_id"]),
             "group_id": int(data["chat_id"]),
@@ -278,7 +245,7 @@ def debts(data):
         print(f"ROW: {row}")
         row_user_id = row[1]
         print(f"ROW USER ID = {row_user_id}")
-        get_usernames = cursor.execute(
+        get_usernames = DB_CURSOR.execute(
             f"SELECT username FROM Users WHERE user_id={row_user_id}"
         )
         row_username = get_usernames.fetchone()[0]
@@ -298,7 +265,7 @@ def debts(data):
     if len(response_string_list) == 0:
         return "You have no debts nor does anyone owe you money. \nGrats, choom"
 
-    return f"Here you go:\n {''.join(response_string_list)}"
+    return f"Here you go:\n{''.join(response_string_list)}"
 
 
 def parse_message(text, chat_id, current_username, current_user_id):
@@ -336,7 +303,6 @@ def parse_message(text, chat_id, current_username, current_user_id):
 # messages should be parsed in handle_mesage function
 # the functions should produce their own strings as a feedback, incl errors to users.
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     # Checks if it is a group chat
     message_type: str = update.message.chat.type
 
@@ -350,16 +316,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f'User ({update.message.chat.id}) in {message_type}: "{text}"')
     print(f"{current_username}")
 
-    if message_type == "group" or message_type == "supergroup":
-        if BOT_USERNAME in text:
-            text: str = text.replace(BOT_USERNAME, "").strip()
-            response: str = parse_message(
-                text, chat_id, current_username, current_user_id
-            )
-        else:
-            return
-    else:
-        return
+    if TELEGRAM_USERNAME in text and \
+    		(message_type == "group" or message_type == "supergroup"):
+        text: str = text.replace(TELEGRAM_USERNAME, "").strip()
+        response: str = parse_message(
+            text, chat_id, current_username, current_user_id
+        )
+   else:
+       return
 
     print("BOT:", response)
     await update.message.reply_text(response)
@@ -371,23 +335,7 @@ async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 if __name__ == "__main__":
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    # COMMANDS forward slashes for specific commands
-    app.add_handler(CommandHandler("start", start_command))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("register", register_command))
-    app.add_handler(CommandHandler("limitations", limitations_command))
-
-    # MESSAGES
-    app.add_handler(MessageHandler(filters.TEXT, handle_message))
-
-    # ERRORS
-    app.add_error_handler(error)
-
-    # POLLING
-    print("polling.")
-    app.run_polling(poll_interval=3)
+    main()
 
 
 # <leader>xx shows all the linting issues...
